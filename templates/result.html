@@ -1,0 +1,21 @@
+<!doctype html>
+<title>Results</title>
+<h2>Sentiment Analysis</h2>
+<ul>
+{% for key, val in sentiment.items() %}
+  <li>{{ key }}: {{ val }}</li>
+{% endfor %}
+</ul>
+
+<h2>Word Cloud</h2>
+<img src="/static/wordcloud.png" width="600">
+
+<h2>Topics</h2>
+<ul>
+{% for topic in topics %}
+  <li>{{ loop.index0 }}: {{ topic | map(attribute=0) | join(', ') }}</li>
+{% endfor %}
+</ul>
+
+<h2>Gemini AI Recommendation</h2>
+<pre>{{ recommendation }}</pre>
