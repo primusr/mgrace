@@ -1,60 +1,60 @@
-import os
-import time
-import re
+
+from flask import Flask, request, render_template, send_file
 import pandas as pd
 import nltk
-from flask import Flask, request, render_template, redirect
-from werkzeug.utils import secure_filename
+import re
+import gensim
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.corpus import stopwords
-from gensim import corpora, models
-from wordcloud import WordCloud
+from gensim import corpora
 import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 from googletrans import Translator
 from langdetect import detect
-import google.generativeai as genai
-
-# Setup
-nltk.download('vader_lexicon')
-nltk.download('stopwords')
-stop_words = set(stopwords.words('english'))
-vader_analyzer = SentimentIntensityAnalyzer()
-translator = Translator()
-genai.configure(api_key="your-api-key-here")
-gemini_model = genai.GenerativeModel('gemini-pro')
-
-UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+import time
+import os
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+nltk.download('vader_lexicon')
+nltk.download('stopwords')
+
+vader_analyzer = SentimentIntensityAnalyzer()
+stop_words = set(stopwords.words('english'))
+translator = Translator()
 
 def get_vader_sentiment(text):
     try:
         lang = detect(text)
-        if lang != 'en' and len(text.split()) > 2:
-            text_en = translator.translate(text, dest='en').text
+        if lang != 'en':
+            if len(text.split()) > 2:
+                time.sleep(0.2)
+                text_en = translator.translate(text, dest='en').text
+            else:
+                text_en = text
         else:
             text_en = text
     except Exception:
         text_en = text
 
-    compound = vader_analyzer.polarity_scores(text_en)['compound']
-    if compound >= 0.05:
+    compound_score = vader_analyzer.polarity_scores(text_en)['compound']
+    if compound_score >= 0.05:
         sentiment = "Positive"
-    elif compound <= -0.05:
+    elif compound_score <= -0.05:
         sentiment = "Negative"
     else:
         sentiment = "Neutral"
-    return compound, sentiment
+    return compound_score, sentiment
 
+def clean_dataframe(file_path):
+    df = pd.read_csv(file_path)
+    for col in df.columns:
+        if col.lower() in ['text', 'comment', 'feedback', 'message']:
+            df.rename(columns={col: 'text'}, inplace=True)
+            break
+    else:
+        raise Exception("The CSV file must contain a 'text', 'comment', 'feedback', or 'message' column.")
 
-def clean_and_analyze(file_path):
-    df = pd.read_csv(file_path, encoding='ISO-8859-1')
-    first_col = df.columns[0]
-    df = df[[first_col]].dropna()
-    df.columns = ['text']
     df['clean_text'] = df['text'].astype(str).apply(lambda x: re.sub(r'\W+', ' ', x).lower())
     df['tokens'] = df['clean_text'].apply(lambda x: [word for word in x.split() if word not in stop_words])
     df['sentiment_data'] = df['clean_text'].apply(get_vader_sentiment)
@@ -62,56 +62,36 @@ def clean_and_analyze(file_path):
     df['sentiment'] = df['sentiment_data'].apply(lambda x: x[1])
     return df
 
-
 def generate_wordcloud(df):
     text = ' '.join([' '.join(tokens) for tokens in df['tokens']])
-    wc = WordCloud(width=800, height=400, background_color='white').generate(text)
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    if not os.path.exists('static'):
+        os.makedirs('static')
+    wordcloud_path = os.path.join('static', 'wordcloud.png')
     plt.figure(figsize=(10, 5))
-    plt.imshow(wc, interpolation='bilinear')
+    plt.imshow(wordcloud, interpolation='bilinear')
     plt.axis('off')
-    plt.tight_layout()
-    plt.savefig("static/wordcloud.png")
+    plt.savefig(wordcloud_path)
     plt.close()
+    return wordcloud_path
 
-
-def generate_lda(df, num_topics=5):
-    dictionary = corpora.Dictionary(df['tokens'])
-    corpus = [dictionary.doc2bow(text) for text in df['tokens']]
-    lda = models.LdaModel(corpus, num_topics=num_topics, id2word=dictionary, passes=15)
-    return lda
-
-
-@app.route("/", methods=["GET", "POST"])
-def upload_file():
-    if request.method == "POST":
-        f = request.files["file"]
-        if f:
-            filepath = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(f.filename))
-            f.save(filepath)
-
-            df = clean_and_analyze(filepath)
-            generate_wordcloud(df)
-            lda_model = generate_lda(df)
-
-            summary = "Sentiment Summary:\n"
-            summary += df['sentiment'].value_counts().to_string() + "\n\n"
-            summary += "Topics:\n"
-            for i in range(lda_model.num_topics):
-                topic_words = [w for w, p in lda_model.show_topic(i)]
-                summary += f"  - Topic {i}: {', '.join(topic_words)}\n"
-
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        file = request.files['file']
+        if file:
+            filepath = os.path.join('uploads', file.filename)
+            if not os.path.exists('uploads'):
+                os.makedirs('uploads')
+            file.save(filepath)
             try:
-                gemini_response = gemini_model.generate_content(summary)
-                recommendation = gemini_response.text
-            except:
-                recommendation = "Gemini API failed."
+                df = clean_dataframe(filepath)
+                wordcloud_path = generate_wordcloud(df)
+                sentiment_counts = df['sentiment'].value_counts().to_dict()
+                return render_template('result.html', sentiment=sentiment_counts, wordcloud_url=wordcloud_path)
+            except Exception as e:
+                return str(e)
+    return render_template('index.html')
 
-            return render_template("result.html", 
-                                   sentiment=df['sentiment'].value_counts().to_dict(),
-                                   recommendation=recommendation,
-                                   topics=[lda_model.show_topic(i, topn=5) for i in range(lda_model.num_topics)])
-    return render_template("upload.html")
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
