@@ -1,8 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Feedback Sentiment Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 2rem; background: #f9f9f9; }
+        h1 { color: #333; }
+        form { margin-top: 2rem; }
+        .flash { color: red; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Upload Feedback CSV</h1>
+    <p><strong>Note:</strong> The CSV file must contain a column named <code>feedback</code>. Wrap sentences with commas in quotes.</p>
 
-<!doctype html>
-<title>Upload CSV</title>
-<h1>Upload CSV for Analysis</h1>
-<form method=post enctype=multipart/form-data>
-  <input type=file name=file>
-  <input type=submit value=Upload>
-</form>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="flash">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".csv" required>
+        <button type="submit">Analyze</button>
+    </form>
+</body>
+</html>

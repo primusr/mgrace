@@ -1,96 +1,98 @@
-
-from flask import Flask, request, render_template, send_file
+import os
 import pandas as pd
 import nltk
-import re
-import gensim
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-from nltk.corpus import stopwords
-from gensim import corpora
-import matplotlib.pyplot as plt
-from wordcloud import WordCloud
-from googletrans import Translator
 from langdetect import detect
-import time
-import os
+from nltk.sentiment import SentimentIntensityAnalyzer
+from textblob import TextBlob
+from nltk.corpus import stopwords
+from flask import Flask, request, render_template, redirect, url_for, flash
 
-app = Flask(__name__)
-
+# Download required NLTK resources
 nltk.download('vader_lexicon')
 nltk.download('stopwords')
 
-vader_analyzer = SentimentIntensityAnalyzer()
+# Flask setup
+app = Flask(__name__)
+app.secret_key = 'secret-key'
+app.config['UPLOAD_FOLDER'] = 'uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize tools and resources
 stop_words = set(stopwords.words('english'))
-translator = Translator()
+filipino_keywords = [
+    'ganda', 'gwapo', 'masaya', 'malungkot', 'mahal', 'galit', 'lungkot', 'takot',
+    'kinakabahan', 'nainis', 'tuwa', 'kilig', 'saya', 'inip', 'pagod'
+]
+sia = SentimentIntensityAnalyzer()
+
+# Sentiment detection functions
+def detect_language(text):
+    try:
+        return detect(text)
+    except:
+        return "unknown"
 
 def get_vader_sentiment(text):
-    try:
-        lang = detect(text)
-        if lang != 'en':
-            if len(text.split()) > 2:
-                time.sleep(0.2)
-                text_en = translator.translate(text, dest='en').text
-            else:
-                text_en = text
-        else:
-            text_en = text
-    except Exception:
-        text_en = text
+    if detect_language(text) != 'en':
+        return {}
+    return sia.polarity_scores(text)
 
-    compound_score = vader_analyzer.polarity_scores(text_en)['compound']
-    if compound_score >= 0.05:
-        sentiment = "Positive"
-    elif compound_score <= -0.05:
-        sentiment = "Negative"
-    else:
-        sentiment = "Neutral"
-    return compound_score, sentiment
+def get_textblob_sentiment(text):
+    if detect_language(text) != 'en':
+        return {}
+    blob = TextBlob(text)
+    return {
+        'polarity': blob.sentiment.polarity,
+        'subjectivity': blob.sentiment.subjectivity
+    }
 
-def clean_dataframe(file_path):
-    df = pd.read_csv(file_path)
-    for col in df.columns:
-        if col.lower() in ['text', 'comment', 'feedback', 'message']:
-            df.rename(columns={col: 'text'}, inplace=True)
-            break
-    else:
-        raise Exception("The CSV file must contain a 'text', 'comment', 'feedback', or 'message' column.")
+def get_filipino_keywords(text):
+    return [word for word in filipino_keywords if word in text.lower()]
 
-    df['clean_text'] = df['text'].astype(str).apply(lambda x: re.sub(r'\W+', ' ', x).lower())
-    df['tokens'] = df['clean_text'].apply(lambda x: [word for word in x.split() if word not in stop_words])
-    df['sentiment_data'] = df['clean_text'].apply(get_vader_sentiment)
-    df['compound'] = df['sentiment_data'].apply(lambda x: x[0])
-    df['sentiment'] = df['sentiment_data'].apply(lambda x: x[1])
-    return df
+# Feedback analysis logic
+def analyze_feedback(df):
+    results = []
+    for _, row in df.iterrows():
+        feedback = str(row['feedback'])
+        lang = detect_language(feedback)
+        result = {
+            'feedback': feedback,
+            'language': lang,
+            'vader': get_vader_sentiment(feedback),
+            'textblob': get_textblob_sentiment(feedback),
+            'filipino_keywords': get_filipino_keywords(feedback)
+        }
+        results.append(result)
+    return results
 
-def generate_wordcloud(df):
-    text = ' '.join([' '.join(tokens) for tokens in df['tokens']])
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
-    if not os.path.exists('static'):
-        os.makedirs('static')
-    wordcloud_path = os.path.join('static', 'wordcloud.png')
-    plt.figure(figsize=(10, 5))
-    plt.imshow(wordcloud, interpolation='bilinear')
-    plt.axis('off')
-    plt.savefig(wordcloud_path)
-    plt.close()
-    return wordcloud_path
-
+# Routes
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        file = request.files['file']
-        if file:
-            filepath = os.path.join('uploads', file.filename)
-            if not os.path.exists('uploads'):
-                os.makedirs('uploads')
-            file.save(filepath)
-            try:
-                df = clean_dataframe(filepath)
-                wordcloud_path = generate_wordcloud(df)
-                sentiment_counts = df['sentiment'].value_counts().to_dict()
-                return render_template('result.html', sentiment=sentiment_counts, wordcloud_url=wordcloud_path)
-            except Exception as e:
-                return str(e)
+        file = request.files.get('file')
+        if not file or file.filename == '':
+            flash('No file selected. Please upload a CSV file.')
+            return redirect(request.url)
+
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(filepath)
+
+        try:
+            df = pd.read_csv(filepath)
+        except pd.errors.ParserError:
+            flash('CSV formatting error. Please check for missing quotes or delimiters.')
+            return redirect(request.url)
+        except Exception as e:
+            flash(f'Unexpected error: {str(e)}')
+            return redirect(request.url)
+
+        if 'feedback' not in df.columns:
+            flash("CSV must contain a 'feedback' column.")
+            return redirect(request.url)
+
+        results = analyze_feedback(df)
+        return render_template('results.html', results=results)
+
     return render_template('index.html')
 
 if __name__ == '__main__':
