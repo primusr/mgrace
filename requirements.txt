@@ -1,6 +1,6 @@
 streamlit
 pandas
-numpy
+numpy>=1.24
 nltk
 matplotlib
 wordcloud
