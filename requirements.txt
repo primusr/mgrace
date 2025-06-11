@@ -6,7 +6,7 @@ matplotlib
 wordcloud
 langdetect
 textblob
-googletrans==4.0.0rc1  # This is the most stable release
+googletrans
 stopwordsiso
 gensim
 google-generativeai
