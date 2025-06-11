@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
-from demo_local_patched import (
+from .demo_local_patched import (
     preprocess_text,
     clean_dataframe,
     get_vader_sentiment_english,
