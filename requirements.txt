@@ -1,21 +1,13 @@
- os
- pandas
- numpy
- nltk
- time
- matplotlib.pyplot 
- io  
- wordcloud  
- langdetect  
- nltk.corpus  
- nltk.stem 
- nltk.sentiment.vader  
- textblob  
- googletrans  
- stopwordsiso 
- gensim 
- gensim.models  
- google.generativeai 
- base64
- streamlit 
- fpdf
+streamlit
+pandas
+numpy
+nltk
+matplotlib
+wordcloud
+langdetect
+textblob
+googletrans==4.0.0rc1  # This is the most stable release
+stopwordsiso
+gensim
+google-generativeai
+fpdf
