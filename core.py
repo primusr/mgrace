@@ -26,6 +26,7 @@ nltk.download('vader_lexicon', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 
 CONFIG = {
    "filipino_lexicon_path": "/content/Fil_words_converted.csv", # Ensure this file is uploaded
