@@ -35,8 +35,9 @@ def main():
     """Generative AI"""
 
     import google.generativeai as genai
+    GOOGLE_API_KEY = "AIzaSyCTa1UnujR0fTUQ2tjotO33k71M15-Ja_I"
 
-    GOOGLE_API_KEY = os.getenv("AIzaSyCTa1UnujR0fTUQ2tjotO33k71M15-Ja_I")
+
     gemini_model = None
     if GOOGLE_API_KEY:
         genai.configure(api_key=GOOGLE_API_KEY)
@@ -61,6 +62,9 @@ def main():
         print(" NLTK resources downloaded (or already up-to-date). ")
     except Exception as e:
         print(f"An error occurred during NLTK downloads: {e}")
+
+
+
 
     DetectorFactory.seed = 0
 
@@ -118,7 +122,7 @@ def main():
     def load_filipino_vader_lexicon(csv_path):
         try:
             if not os.path.exists(csv_path):
-                print(f"Warning: Lexicon file '{csv_path}' not found in /content/. Attempting to upload...")
+                #print(f"Warning: Lexicon file '{csv_path}' not found in /content/. Attempting to upload...")
                 uploaded_lex_files ="Fil_words_converted.csv" 
                 if os.path.basename(csv_path) not in uploaded_lex_files:
                     print(f"Error: '{os.path.basename(csv_path)}' not uploaded. Cannot augment VADER lexicon.")
@@ -149,7 +153,7 @@ def main():
 
     gemini_model = None
     try:
-        GOOGLE_API_KEY = os.getenv('AIzaSyCTa1UnujR0fTUQ2tjotO33k71M15-Ja_I', '')
+        GOOGLE_API_KEY = "AIzaSyCTa1UnujR0fTUQ2tjotO33k71M15-Ja_I"
         if not GOOGLE_API_KEY: raise ValueError("GOOGLE_API_KEY not in Colab secrets.")
         genai.configure(api_key=GOOGLE_API_KEY); print("Gemini API key configured.")
         gemini_model = genai.GenerativeModel(CONFIG["gemini_model_name"]); print(f"Gemini model '{CONFIG['gemini_model_name']}' initialized.")
@@ -200,14 +204,14 @@ def main():
         if not original_text_column:
             if df.shape[1] > 0 and (df.columns[0] == 0 or isinstance(df.columns[0], int)):
                 original_text_column = df.columns[0]
-                print(f"Warning: Preferred cols not found. Using first col ('{str(original_text_column)}').")
+                #print("Warning: Preferred cols not found. Using first col ('{str(original_text_column)}').")
             elif any(df[col].dtype == 'object' for col in df.columns):
                 potential_cols = [col for col in df.columns if df[col].dtype == 'object']
                 original_text_column = max(potential_cols, key=lambda col: df[col].astype(str).str.len().mean(), default=None)
                 if original_text_column: print(f"Warning: Preferred cols not found. Guessed: '{original_text_column}'")
         if not original_text_column and df.shape[1] > 0:
             original_text_column = df.columns[0]
-            print(f"Warning: Still couldn't find good col. Using first: '{str(original_text_column)}'")
+           # print(f"Warning: Still couldn't find good col. Using first: '{str(original_text_column)}'")
         elif not original_text_column: raise ValueError("DataFrame empty or no suitable text column.")
         df['Original_Text'] = df[original_text_column].copy()
         df = df[df[original_text_column].notnull() & (df[original_text_column].astype(str) != '0')]
@@ -447,6 +451,7 @@ def main():
                                 if valid_umass: plt.subplot(3, 1, 2); plt.plot(valid_x, valid_umass, marker='o', color='orange'); plt.xlabel("Num Topics"); plt.ylabel("UMass Coherence (Closer to 0 better)"); plt.title("UMass Coherence"); plt.xticks(valid_x); plt.grid(True)
                                 if valid_cnpmi: plt.subplot(3, 1, 3); plt.plot(valid_x, valid_cnpmi, marker='o', color='green'); plt.xlabel("Num Topics"); plt.ylabel("C_NPMI Coherence (Closer to 1 better)"); plt.title("C_NPMI Coherence"); plt.xticks(valid_x); plt.grid(True)
                                 plt.tight_layout(); plt.show()
+                             
                                 if valid_cv: optimal_num_topics = valid_x[np.nanargmax(valid_cv) if any(cv is not None for cv in valid_cv) else 0]; print(f"\nOptimal topics (C_v): {optimal_num_topics}")
                                 else: print("No valid C_v scores. Using default.")
                             else: print("No LDA models trained. Using default.")
@@ -492,6 +497,8 @@ def main():
                         plt.figure(figsize=(7,5)); word_cloud_dict = {word: prob for word, prob in top_words_probs}
                         plt.imshow(WordCloud(stopwords=combined_stopwords, background_color="white").fit_words(word_cloud_dict))
                         plt.axis("off"); plt.title(f"Topic #{topic_id_lda}: {ai_label if ai_label != 'Labeling Error' else 'Keywords Shown'}"); plt.show(); print("-" * 20)
+                    
+
                     if lda_model:
                         print("\nOverall Coherence Scores for Final LDA Model")
                         coherence_model_cv_final = CoherenceModel(model=lda_model, texts=tokenized_texts_for_lda_dict, dictionary=dictionary, coherence='c_v'); print(f"C_v Coherence: {coherence_model_cv_final.get_coherence():.4f} (Higher is better)")
@@ -586,34 +593,7 @@ def main():
     """8. Visualization of Sentiments"""
 
     print("\nVisualizations")
-    if not cleaned_df.empty:
-        num_plots = 0
-        if 'VADER_Sentiment_Eng' in cleaned_df.columns: num_plots += 1
-        if 'VADER_Sentiment_Aug' in cleaned_df.columns: num_plots += 1
-        if 'Filipino_Keyword_Sentiment' in cleaned_df.columns: num_plots +=1
-        if num_plots > 0:
-            fig, axes = plt.subplots(1, num_plots, figsize=(6 * num_plots, 5), squeeze=False); axes = axes.flatten(); plot_idx = 0
-            if 'VADER_Sentiment_Eng' in cleaned_df.columns:
-                s_counts = cleaned_df['VADER_Sentiment_Eng'].value_counts()
-                if not s_counts.empty: sns.barplot(x=s_counts.index,y=s_counts.values,hue=s_counts.index,palette=['g','lightcoral','lightskyblue'],ax=axes[plot_idx],legend=False); axes[plot_idx].set_title('VADER (Eng/Translated)')
-                else: axes[plot_idx].set_title('VADER (Eng/Translated) (No Data)')
-                axes[plot_idx].set_xlabel('Sentiment'); axes[plot_idx].set_ylabel('Count'); plot_idx +=1
-            elif num_plots > plot_idx and plot_idx < len(axes): axes[plot_idx].set_title('VADER (Eng/Translated) (Col N/A)'); plot_idx +=1
-            if 'VADER_Sentiment_Aug' in cleaned_df.columns:
-                s_counts = cleaned_df['VADER_Sentiment_Aug'].value_counts()
-                if not s_counts.empty: sns.barplot(x=s_counts.index,y=s_counts.values,hue=s_counts.index,palette=['g','lightcoral','lightskyblue'],ax=axes[plot_idx],legend=False); axes[plot_idx].set_title('VADER (Augmented)')
-                else: axes[plot_idx].set_title('VADER (Augmented) (No Data)')
-                axes[plot_idx].set_xlabel('Sentiment'); axes[plot_idx].set_ylabel('Count'); plot_idx +=1
-            elif num_plots > plot_idx and plot_idx < len(axes): axes[plot_idx].set_title('VADER (Augmented) (Col N/A)'); plot_idx +=1
-            if 'Filipino_Keyword_Sentiment' in cleaned_df.columns and plot_idx < len(axes):
-                s_counts = cleaned_df['Filipino_Keyword_Sentiment'].value_counts()
-                if not s_counts.empty: sns.barplot(x=s_counts.index,y=s_counts.values,hue=s_counts.index,palette=['g','lightcoral','lightskyblue'],ax=axes[plot_idx],legend=False); axes[plot_idx].set_title('Filipino Keyword Sentiment')
-                else: axes[plot_idx].set_title('Filipino Keyword (No Data)')
-                axes[plot_idx].set_xlabel('Sentiment'); axes[plot_idx].set_ylabel('Count'); plot_idx +=1
-            elif num_plots > plot_idx and plot_idx < len(axes): axes[plot_idx].set_title('Filipino Keyword (Col N/A)'); plot_idx +=1
-            plt.suptitle("Sentiment Category Distributions", fontsize=16, y=1.03); plt.tight_layout(); plt.show()
-        else: print("No sentiment data columns for bar chart.")
-    else: print("cleaned_df empty. Skipping Sentiment Bar Charts.")
+   
 
     """8.1. Scatter Plots of VADER Polarity Scores"""
 
@@ -681,6 +661,8 @@ def main():
         fig.legend(handles=handles, title="Sentiment", bbox_to_anchor=(1.01, 0.9))
         plt.tight_layout(rect=[0, 0, 0.95, 1])
         plt.show()
+       
+
         print("Discussion (Scatter Plots): These plots show each feedback's polarity score across the three methods, colored by sentiment. This comparison helps assess the consistency and impact of different analysis techniques.")
         print("-" * 50)
 
@@ -712,6 +694,7 @@ def main():
             plt.ylim(-1.1, 1.1)
             plt.axhline(0, color='grey', linestyle='--', linewidth=0.8)
             plt.show()
+         
             print("Discussion (Sentiment Trajectory): This plot shows the trend of polarity scores. The colored points represent individual feedback sentiment, while the line shows the smoothed average trend over time (or index).")
         else:
             print("VADER_Score_Aug column missing or too few data points for a meaningful trend line.")
@@ -737,6 +720,8 @@ def main():
             plt.axhline(0, color='grey', linestyle='--', linewidth=0.8)
             plt.axvline(0.5, color='grey', linestyle=':', linewidth=0.8)
             plt.show()
+       
+
             print("Discussion (Polarity vs. Subjectivity): This plot helps understand the nature of the feedback.")
             print("- Green dots are positive opinions, Red dots are negative opinions, and Orange dots are neutral.")
             print("- Points to the right are more subjective (opinions), while points to the left are more objective (facts).")
@@ -863,6 +848,63 @@ def main():
     else: print("\nSkipping manual input interface (Gemini not configured).")
 
     print("\nProcessing Complete")
+    from fpdf import FPDF
+
+    def export_results_to_pdf(cleaned_df, df_topic_sentiments, all_recs_data, output_filename="sentiment_analysis_report.pdf"):
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+
+        def add_title(text):
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(0, 10, text, ln=True)
+            pdf.ln(5)
+
+        def add_section(text):
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, text, ln=True)
+
+        def add_text(text, font_size=10):
+            pdf.set_font("Arial", "", font_size)
+            for line in text.split("\n"):
+                pdf.multi_cell(0, 10, line)
+            pdf.ln(3)
+
+        pdf.add_page()
+        add_title("Sentiment Analysis Report")
+
+        # Summary stats
+        add_section("Summary Statistics")
+        add_text(f"Total Comments Processed: {len(cleaned_df)}")
+
+        # Sentiment Distribution (VADER Eng)
+        if 'VADER_Sentiment_Eng' in cleaned_df.columns:
+            add_section("VADER (English) Sentiment Distribution")
+            dist = cleaned_df['VADER_Sentiment_Eng'].value_counts().to_dict()
+            add_text("\n".join([f"{k}: {v}" for k, v in dist.items()]))
+
+        # Topic Sentiment Table
+        if not df_topic_sentiments.empty:
+            add_section("Sentiment by Topic")
+            for _, row in df_topic_sentiments.iterrows():
+                info = f"Topic {row['Topic ID']} - {row['AI Label']}\nTop Words: {row['Top Keywords']}\nComments: {row['Num Comments']}"
+                info += f"\nAvg VADER (Aug): {row.get('Avg VADER Aug Score', 'N/A')}\n"
+                add_text(info)
+
+        # Gemini Recommendations
+        if all_recs_data:
+            add_section("Gemini Recommendations")
+            for rec in all_recs_data:
+                add_text(f"Type: {rec['Type']}\nPrompt:\n{rec['Input_Summary_To_Gemini']}\n\nRecommendation:\n{rec['Gemini_Recommendations']}")
+                pdf.ln(5)
+
+        # Save PDF
+        pdf.output(output_filename)
+        print(f"\nPDF report saved as '{output_filename}'")
+
+    export_results_to_pdf(cleaned_df, df_topic_sentiments, all_gemini_recommendations_data)
+
+
+
 if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
