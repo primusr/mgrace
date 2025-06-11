@@ -1,8 +1,21 @@
-streamlit
-nltk
-pandas
-matplotlib
-wordcloud
-scikit-learn
-langdetect
-textblob
+ os
+ pandas
+ numpy
+ nltk
+ time
+ matplotlib.pyplot 
+ io  
+ wordcloud  
+ langdetect  
+ nltk.corpus  
+ nltk.stem 
+ nltk.sentiment.vader  
+ textblob  
+ googletrans  
+ stopwordsiso 
+ gensim 
+ gensim.models  
+ google.generativeai 
+ base64
+ streamlit 
+ fpdf
